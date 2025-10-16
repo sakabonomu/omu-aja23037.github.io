@@ -22,8 +22,8 @@
             document.getElementById('clock').innerHTML = timeString;
         }
         
-        // 0.01秒ごとにupdateClock関数を実行
-        setInterval(updateClock, 10);
+        // 0.001秒ごとにupdateClock関数を実行
+        setInterval(updateClock, 1);
         
         // ページ読み込み時に即座に表示
         window.onload = updateClock;
@@ -38,7 +38,7 @@
     
 <body>
     <h1>現在時刻</h1>
-    <div id="clock" style="font-size: 48px; font-weight: bold; color: blue;">
+    <div id="clock" style="font-size: 40px; font-weight: bold; color: green;">
         00:00:00
     </div>
     <h1>Webシステム構築基礎 第2回課題</h1>
