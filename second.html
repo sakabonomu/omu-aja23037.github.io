@@ -16,6 +16,29 @@
         </form>
 
     
+    <form onsubmit="return false">
+        <input type="number" id="num01"> 演算
+        <input type="number" id="num02"> =
+        <output for="num01 num02" id="result0"></output>
+        
+        <input id="plus" type="radio" name="cal0" value="+" checked>
+        <label for="plus">足す</label>
+        <input id="minus" type="radio" name="cal0" value="-">
+        <label for="minus">引く</label>
+        
+        <input id="multiply" type="radio" name="cal0" value="*">
+        <label for="multiply">掛ける</label>
+        <input id="divide" type="radio" name="cal0" value="/">
+        <label for="divide">割る</label>
+        <button onclick="result0.value = 
+            (cal0[0].checked)? Number(num01.value) + Number(num02.value) :
+            (cal0[1].checked)? Number(num01.value) - Number(num02.value) :
+            (cal0[2].checked)? Number(num01.value) * Number(num02.value) :
+            (cal0[3].checked)? Number(num01.value) / Number(num02.value) : NaN">計算</button>
+    </form>
+    
+
+    
     <!-- <img src="https://github.com/sakabonomu/omu-aja23037.github.io/blob/4bf330966d79d12031d80c3eb201ff5bf7bbeca0/maikosan.png" 
      width="300" alt="トップ画像"> -->
     <!-- <img src="maikosan.png" width="300" alt="舞子さん画像"> -->
@@ -59,27 +82,6 @@
         <!-- <a href="https://www.google.com/" target="_blank">Google</a> -->
         <a href="index.html">1ページ目へ</a>
     </div>
-    
-    <form onsubmit="return false">
-        <input type="number" id="num01"> 演算
-        <input type="number" id="num02"> =
-        <output for="num01 num02" id="result0"></output>
-        
-        <input id="plus" type="radio" name="cal0" value="+" checked>
-        <label for="plus">足す</label>
-        <input id="minus" type="radio" name="cal0" value="-">
-        <label for="minus">引く</label>
-        
-        <input id="multiply" type="radio" name="cal0" value="*">
-        <label for="multiply">掛ける</label>
-        <input id="divide" type="radio" name="cal0" value="/">
-        <label for="divide">割る</label>
-        <button onclick="result0.value = 
-            (cal0[0].checked)? Number(num01.value) + Number(num02.value) :
-            (cal0[1].checked)? Number(num01.value) - Number(num02.value) :
-            (cal0[2].checked)? Number(num01.value) * Number(num02.value) :
-            (cal0[3].checked)? Number(num01.value) / Number(num02.value) : NaN">計算</button>
-    </form>
     
 </body>
 </html>
