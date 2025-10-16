@@ -7,6 +7,15 @@
     <!-- <title>おすすめの旅行先</title> -->
 </head>
 <body>
+
+    <h2>BMI指標計算</h2>
+        <form oninput="bmi.value = Math.round(Number(weight.value) / Math.pow(Number(height.value)/100, 2) * 10) / 10">
+            <p><label>体重(kg)：<input name="weight" type="number" step="any"></label></p>
+            <p><label>身長(cm)：<input name="height" type="number" step="any"></label></p>
+            <p><label>BMI：<output name="bmi"></output></label></p>
+        </form>
+
+    
     <!-- <img src="https://github.com/sakabonomu/omu-aja23037.github.io/blob/4bf330966d79d12031d80c3eb201ff5bf7bbeca0/maikosan.png" 
      width="300" alt="トップ画像"> -->
     <!-- <img src="maikosan.png" width="300" alt="舞子さん画像"> -->
