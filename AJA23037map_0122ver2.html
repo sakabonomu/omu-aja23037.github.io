@@ -1,0 +1,340 @@
+﻿<!DOCTYPE html>
+<html>
+    <head>
+        <title>統合地図アプリ（学校・ルート・地震・経路検索・鉄道）</title>
+        <meta charset="utf-8">
+        
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+            integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+            crossorigin=""
+        />
+        <script
+            src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+            integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+            crossorigin=""
+        ></script>
+        
+         <script src="https://unpkg.com/leaflet.markercluster@1.3.0/dist/leaflet.markercluster.js"></script>
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.Default.css"
+        />
+        
+        <script src="./L.KML.js"></script>
+        
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mwasil/Leaflet.Rainviewer/leaflet.rainviewer.css"/>
+        <script src="https://cdn.jsdelivr.net/gh/mwasil/Leaflet.Rainviewer/leaflet.rainviewer.js"></script>
+
+        <style>
+            /* 経路検索コントロール用の簡易スタイル */
+            .routing-control {
+                padding: 10px;
+                background: #f0f0f0;
+                border-bottom: 1px solid #ccc;
+                font-family: sans-serif;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="routing-control">
+            <strong>経路検索：</strong>
+            <input type="button" value="出発地点を選択" onclick="selectionMode='startPoint';" />
+            <input id="startPoint" value="" placeholder="地図をクリックまたは入力" size="30" />
+            <br style="margin-bottom:5px;"/>
+            <input type="button" value="目的地を選択　" onclick="selectionMode='destination';" />
+            <input id="destination" value="" placeholder="地図をクリックまたは入力" size="30" />
+            <br style="margin-bottom:5px;"/>
+            <input type="button" value="　ルート検索実行　" onclick="startRouteSearch()" />
+        </div>
+
+        <div id="map" style="height: 85vh"></div>
+        
+        <script>
+            // --- 1. マップの基本設定 ---
+
+            // 地図インスタンスを初期化
+            const map = L.map('map', {
+                center: [34.545911, 135.503204], // 初期表示：なかもずキャンパス
+                zoom: 14, 
+            });
+
+            // 背景レイヤー：OpenStreetMap
+            const backgroundLayer = L.tileLayer(
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                },
+            );
+            map.addLayer(backgroundLayer);
+
+            // 背景レイヤー：地理院地図
+            const chiriinLayer = L.tileLayer(
+                'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+                { maxZoom: 17 },
+            );
+            map.addLayer(chiriinLayer);
+
+            // レイヤーコントロール
+            var LayerControl = L.control.layers({
+                "地理院地図（標準）": chiriinLayer,
+                "OpenStreetMap": backgroundLayer
+            }).addTo(map);
+
+            // スケールバー
+            L.control.scale().addTo(map);
+
+            // --- 2. 既存コンテンツ (マーカー, GeoJSON, KML) ---
+
+            // なかもずキャンパスマーカー
+            const nakamozu_marker = L.marker([34.545911,135.503204]);
+            nakamozu_marker.bindPopup('なかもずキャンパスB6棟');
+            map.addLayer(nakamozu_marker);
+
+            // 国土数値情報 - 学校データ (GeoJSON + Clustering)
+            map.attributionControl.addAttribution(
+                '<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-P29-v2_0.html">国土数値情報</a>',
+            );
+            fetch('./P29-21.geojson')
+                .then((res) => res.json())
+                .then((json) => {
+                    const markers = L.markerClusterGroup()
+                        .bindPopup((layer) => layer.feature.properties.P29_004)
+                        .addTo(map);
+                    L.geoJSON(json).addTo(markers);
+                    // レイヤーコントロールに追加したい場合は以下を有効化
+                    // LayerControl.addOverlay(markers, "学校データ");
+                });
+
+            // KMLルート (niigata_route.kml)
+            fetch("./niigata_route.kml") 
+                .then(res => res.text())
+                .then(kmltext => {
+                    const parser = new DOMParser();
+                    const kml = parser.parseFromString(kmltext, 'text/xml');
+                    const track = new L.KML(kml);
+                    map.addLayer(track);
+                });
+
+            // ラインレイヤー (line.geojson)
+            fetch("./line.geojson")
+                .then((response) => response.json())
+                .then((data) => {
+                var line = L.geoJSON(data, {
+                    "color": "#FF00FF",
+                    "weight": 6,
+                    "opacity": 0.65
+                })
+                    map.addLayer(line)
+                    LayerControl.addOverlay(line, "ルート(GeoJSON)")
+            });
+
+            // 行政区域レイヤー (N03-23_27_230101.geojson)
+            fetch("./N03-23_27_230101.geojson")
+                .then((response) => response.json())
+                .then((data) => {
+                    var filteredData = data.features.filter(feature => feature.properties.N03_004 === '堺市中区');
+                    var selected_area = L.geoJSON(filteredData)
+                        .bindPopup((layer) => layer.feature.properties.N03_004);
+                    map.addLayer(selected_area);
+                    LayerControl.addOverlay(selected_area, "行政区域");
+            });
+
+            // 都道府県境界レイヤー（prefectures.geojson）
+            fetch('./prefectures.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    var PolygonLayer_Style = {
+                        "color": "#ffffff",
+                        "weight": 1.5,
+                        "opacity": 1,
+                        "fillColor": "#3a3a3a",
+                        "fillOpacity": 0.2 // 背景が見えるように薄めに設定
+                    };
+                    var prefLayer = L.geoJSON(data, {
+                        style: PolygonLayer_Style
+                    });
+                    map.addLayer(prefLayer);
+                    LayerControl.addOverlay(prefLayer, "都道府県境界");
+                });
+
+            // 雨雲レイヤー
+            L.control.rainviewer({ 
+                position: 'bottomleft',
+                nextButtonText: '>',
+                playStopButtonText: 'Play/Stop',
+                prevButtonText: '<',
+                positionSliderLabelText: "Hour:",
+                opacitySliderLabelText: "Opacity:",
+                animationInterval: 500,
+                opacity: 0.5
+            }).addTo(map);
+
+
+            // --- 3. 新規追加: 鉄道データ (駅・路線) ---
+
+            // (1) 鉄道路線データ (N02-20_RailroadSection.geojson)
+            fetch('./N02-20_RailroadSection.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    var railroadLine = L.geoJSON(data, {
+                        style: function(feature) {
+                            return {
+                                color: "#006400", // 濃い緑色
+                                weight: 3,
+                                opacity: 0.8
+                            };
+                        },
+                        onEachFeature: function(feature, layer) {
+                            // 路線名などをポップアップ表示
+                            if (feature.properties && feature.properties.N02_003) {
+                                layer.bindPopup("路線名: " + feature.properties.N02_003);
+                            }
+                        }
+                    });
+                    map.addLayer(railroadLine);
+                    LayerControl.addOverlay(railroadLine, "鉄道路線");
+                });
+
+            // (2) 鉄道駅データ (N02-20_Station.geojson)
+            fetch('./N02-20_Station.geojson') 
+                .then((response) => response.json())
+                .then((data) => {
+                    var stations = L.geoJSON(data, {
+                        // ポイントを円マーカーとして表示
+                        pointToLayer: function (feature, latlng) {
+                            return L.circleMarker(latlng, {
+                                radius: 5,           // 円の大きさ
+                                fillColor: "#ffffff", // 白で塗りつぶし
+                                color: "#000000",     // 黒い枠線
+                                weight: 2,
+                                opacity: 1,
+                                fillOpacity: 1
+                            });
+                        },
+                        onEachFeature: function (feature, layer) {
+                            // 駅名と路線名を表示
+                            var popupText = '<strong>' + feature.properties.N02_005 + '</strong><br>' +
+                                            '<span style="font-size:0.9em;">' + feature.properties.N02_003 + '</span>';
+                            layer.bindPopup(popupText);
+                        }
+                    });
+
+                    map.addLayer(stations);
+                    LayerControl.addOverlay(stations, "鉄道駅");
+                });
+
+
+            // --- 4. 経路検索機能 ---
+            
+            var selectionMode;      
+            var startMarker;        
+            var destinationMarker;  
+            var routeLayer;         
+
+            // 地図クリック時の処理
+            map.on('click', function (e) {
+                var latlng = e.latlng;
+                if (selectionMode == 'startPoint') {
+                    if (startMarker != null) { map.removeLayer(startMarker); }
+                    startMarker = L.marker([latlng.lat, latlng.lng]).addTo(map);
+                    startMarker.bindPopup("出発地点").openPopup();
+                    document.getElementById("startPoint").value = latlng.lng.toFixed(6) + "," + latlng.lat.toFixed(6);
+                    selectionMode = null;
+                } else if (selectionMode == 'destination') {
+                    if (destinationMarker != null) { map.removeLayer(destinationMarker); }
+                    destinationMarker = L.marker([latlng.lat, latlng.lng]).addTo(map);
+                    destinationMarker.bindPopup("目的地").openPopup();
+                    document.getElementById("destination").value = latlng.lng.toFixed(6) + "," + latlng.lat.toFixed(6);
+                    selectionMode = null;
+                }
+            });
+
+            // ルート検索の実行
+            function startRouteSearch() {
+                var startPointCood = document.getElementById("startPoint").value;
+                var destinationCood = document.getElementById("destination").value;
+                
+                if(!startPointCood || !destinationCood){
+                    alert("出発地点と目的地を設定してください");
+                    return;
+                }
+                var url = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/' + startPointCood + ';' + destinationCood + '?geometries=geojson&overview=full';
+                
+                fetch(url)
+                    .then(response => response.json())
+                    .then(json => {
+                        if (routeLayer != null) { map.removeLayer(routeLayer); }
+                        routeLayer = L.geoJSON(json['routes'][0]['geometry'],{
+                            "color": "#0000FF", // 青色
+                            "weight": 6,
+                            "opacity": 0.65
+                        });
+                        routeLayer.addTo(map);
+                        LayerControl.addOverlay(routeLayer, "検索ルート");
+                        map.fitBounds(routeLayer.getBounds());
+                    })
+                    .catch(err => alert("ルート検索に失敗しました: " + err));
+            }
+
+
+            // --- 5. 地震情報 (P2PQuake API) ---
+
+            fetch("https://api.p2pquake.net/v2/history?codes=551")
+                .then(response => response.json())
+                .then(data => {
+                    var shingenIconImage = L.icon({
+                        iconUrl: './shingen.png',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20],
+                        popupAnchor: [0, -40]
+                    });
+
+                    var earthquakeLayerGroup = L.layerGroup();
+
+                    data.forEach(function(report) {
+                        var earthquake = report.earthquake;
+                        var hypocenter = earthquake.hypocenter;
+
+                        if (hypocenter.latitude === -1 || hypocenter.longitude === -1) { return; }
+
+                        let maxInt_data = earthquake.maxScale;
+                        var maxIntText = maxInt_data == 10 ? "1" : maxInt_data == 20 ? "2" : maxInt_data == 30 ? "3" : maxInt_data == 40 ? "4" :
+                                         maxInt_data == 45 ? "5弱" : maxInt_data == 46 ? "5弱" : maxInt_data == 50 ? "5強" : maxInt_data == 55 ? "6弱" :
+                                         maxInt_data == 60 ? "6強" : maxInt_data == 70 ? "7" : "不明";
+                        
+                        var Magnitude = hypocenter.magnitude != -1 ? (hypocenter.magnitude).toFixed(1) : 'ー.ー';
+                        var Name = hypocenter.name != "" ? hypocenter.name : '情報なし';
+                        var Depth = hypocenter.depth != -1 ? "約" + hypocenter.depth + "km" : '不明';
+                        var Time = earthquake.time;
+                        var IssueTime = report.issue.time;
+                        var Source = report.issue.source;
+
+                        var popupContent = '発生時刻：' + Time + '<br>最大震度：' + maxIntText + 
+                                           '<br>震源地：' + Name + '<span style=\"font-size: 85%;\"> (' + hypocenter.latitude + ", " + hypocenter.longitude + ')</span>' +
+                                           '<br>規模：M' + Magnitude + '　深さ：' + Depth + 
+                                           '<br>受信：' + IssueTime + ', ' + Source;
+
+                        var shingenIcon = L.marker([hypocenter.latitude, hypocenter.longitude], { icon: shingenIconImage });
+                        shingenIcon.bindPopup(popupContent, {closeButton: false, maxWidth: 300});
+                        shingenIcon.on('mouseover', function (e) { this.openPopup(); });
+                        shingenIcon.on('mouseout', function (e) { this.closePopup(); });
+
+                        shingenIcon.addTo(earthquakeLayerGroup);
+                    });
+
+                    // 地図に追加＆レイヤーコントロールに追加
+                    // 初期表示ではOFFにしておきたい場合は .addTo(map) を削除してください
+                    earthquakeLayerGroup.addTo(map);
+                    LayerControl.addOverlay(earthquakeLayerGroup, "地震情報");
+                });
+
+        </script>
+    </body>
+</html>
